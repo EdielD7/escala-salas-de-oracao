@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Escala das Salas de Oração - IDPB Filadélfia</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* Custom Font Poppins */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a; /* bg-slate-900, inspired by the image */
+            color: #f1f5f9; /* text-slate-100 */
+        }
+        /* Style for the PDF generation container */
+        .pdf-container {
+            font-family: 'Poppins', sans-serif;
+            background-color: white;
+            color: #1e293b;
+            padding: 1.5rem;
+            width: 820px; /* Increased width to prevent cutoff */
+        }
+        .pdf-container h1, .pdf-container h2, .pdf-container h3 {
+            color: #0f172a;
+        }
+        /* Custom animation for revealing supervisor */
+        .reveal-enter {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        .reveal-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 300ms, transform 300ms;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- Helper Functions ---
+
+        /**
+         * Adds a specified number of days to a given date.
+         * @param {Date} date - The starting date.
+         * @param {number} days - The number of days to add.
+         * @returns {Date} - The new date.
+         */
+        function addDays(date, days) {
+            const result = new Date(date);
+            result.setDate(result.getDate() + days);
+            return result;
+        }
+
+        /**
+         * Gets the Monday of the week for a given date.
+         * @param {Date} d - The input date.
+         * @returns {Date} - The date of the Monday of that week.
+         */
+        function getMondayOfDate(d) {
+            const date = new Date(d);
+            const day = date.getDay(); // Sunday - 0, Monday - 1, ...
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+            const monday = new Date(date.setDate(diff));
+            monday.setHours(0, 0, 0, 0); // Reset time to beginning of the day
+            return monday;
+        }
+
+        /**
+         * Formats a date into DD/MM/YYYY format.
+         * @param {Date} date - The date to format.
+         * @returns {string} - The formatted date string.
+         */
+        const formatDate = (date) => {
+            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        };
+        
+        /**
+         * Capitalizes the first letter of a string.
+         * @param {string} s - The input string.
+         * @returns {string} - The capitalized string.
+         */
+        const capitalize = s => s && s.charAt(0).toUpperCase() + s.slice(1);
+
+        // --- Schedule Generation Logic ---
+        const generateScheduleData = (startDate, numWeeks) => {
+            const schedule = [];
+            const coordinations = [1, 2, 3, 4, 5, 6, 7];
+            const supervisorsCoord3 = ['Lucivaldo', 'Flávio', 'Ediel', 'Tony', 'Henrique'];
+            
+            let currentDate = new Date(startDate);
+            let coordIndex = 0;
+            let supervisorIndex = 0;
+
+            const baseDate = new Date('2025-06-02T00:00:00');
+            let initialDate = new Date(baseDate);
+            let initialCoordIndex = 0;
+            let initialSupervisorIndex = 0;
+
+            while (initialDate < startDate) {
+                 const dayOfWeek = initialDate.getDay();
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    if (dayOfWeek !== 1) {
+                        if (coordinations[initialCoordIndex % 7] === 3) initialSupervisorIndex++;
+                        initialCoordIndex++;
+                    }
+                    if (dayOfWeek !== 3) {
+                       if (coordinations[initialCoordIndex % 7] === 3) initialSupervisorIndex++;
+                       initialCoordIndex++;
+                    }
+                }
+                initialDate = addDays(initialDate, 1);
+            }
+            coordIndex = initialCoordIndex;
+            supervisorIndex = initialSupervisorIndex;
+
+            for (let week = 0; week < numWeeks; week++) {
+                const weekData = { id: `week-${week}`, startDate: new Date(currentDate), days: [] };
+                const weekCoord3Appearances = [];
+
+                let tempCurrentDate = new Date(currentDate);
+                let tempCoordIndex = coordIndex;
+                for (let day = 0; day < 5; day++) {
+                    const dayOfWeek = tempCurrentDate.getDay();
+                    if(dayOfWeek !== 1){
+                        if (coordinations[tempCoordIndex % 7] === 3) weekCoord3Appearances.push({ dayOfWeek, time: '6h' });
+                        tempCoordIndex++;
+                    }
+                    if (dayOfWeek !== 3) {
+                        if (coordinations[tempCoordIndex % 7] === 3) weekCoord3Appearances.push({ dayOfWeek, time: '21h' });
+                        tempCoordIndex++;
+                    }
+                    tempCurrentDate = addDays(tempCurrentDate, 1);
+                }
+                
+                const isDanielWeek = weekCoord3Appearances.length >= 2 && 
+                    weekCoord3Appearances.some(a => a.dayOfWeek === 1) && 
+                    weekCoord3Appearances.some(a => a.dayOfWeek === 5);
+
+                for (let day = 0; day < 5; day++) {
+                    const dayOfWeek = currentDate.getDay();
+                    const dayName = currentDate.toLocaleDateString('pt-BR', { weekday: 'long' });
+                    const daySlots = { date: formatDate(currentDate), dayName: capitalize(dayName), slots: [] };
+
+                    // 6h Slot
+                    if (dayOfWeek === 1) {
+                        daySlots.slots.push({ time: '6h', responsible: 'Pr. Joel Santos', coord: 0 });
+                    } else {
+                        const currentCoord = coordinations[coordIndex % 7];
+                        let responsible = `Coordenação ${currentCoord}`;
+                        if (currentCoord === 3) {
+                            responsible = `Coordenação 3 (${supervisorsCoord3[supervisorIndex % supervisorsCoord3.length]})`;
+                            supervisorIndex++;
+                        }
+                        daySlots.slots.push({ time: '6h', responsible, coord: currentCoord });
+                        coordIndex++;
+                    }
+
+                    // 21h Slot
+                    if (dayOfWeek !== 3) {
+                        const currentCoord = coordinations[coordIndex % 7];
+                        let responsible = `Coordenação ${currentCoord}`;
+                        if (currentCoord === 3) {
+                             if(isDanielWeek && dayOfWeek === 5) {
+                                responsible = `Coordenação 3 (Daniel - Coordenador)`;
+                             } else {
+                                responsible = `Coordenação 3 (${supervisorsCoord3[supervisorIndex % supervisorsCoord3.length]})`;
+                             }
+                            supervisorIndex++;
+                        }
+                        daySlots.slots.push({ time: '21h', responsible, coord: currentCoord });
+                        coordIndex++;
+                    } else {
+                        daySlots.slots.push({ time: '19h30', responsible: 'Culto de Oração', coord: -1 });
+                    }
+                    weekData.days.push(daySlots);
+                    currentDate = addDays(currentDate, 1);
+                }
+                schedule.push(weekData);
+                currentDate = addDays(currentDate, 2);
+            }
+            return schedule;
+        };
+        
+        // --- React Components ---
+
+        const SlotCard = ({ slot, onCoord3Click, isExpanded }) => {
+            const isCoord3 = slot.responsible.includes('Coordenação 3');
+            const isCulto = slot.responsible.includes('Culto');
+            
+            let displayResponsible = slot.responsible;
+            let supervisor = '';
+
+            if (isCoord3) {
+                const match = slot.responsible.match(/\(([^)]+)\)/);
+                if (match) supervisor = match[1];
+                displayResponsible = 'Coordenação 3';
+            }
+
+            const cardClasses = `p-3 rounded-lg flex flex-col transition-all duration-300 h-full ${
+                isCulto
+                    ? 'bg-amber-900/20 border border-amber-700/50'
+                    : isCoord3
+                    ? 'bg-blue-900/30 border border-blue-700/50 cursor-pointer hover:bg-blue-800/40'
+                    : 'bg-slate-800/60 border border-slate-700/50'
+            }`;
+
+            return (
+                <div className={cardClasses} onClick={isCoord3 ? () => onCoord3Click() : undefined}>
+                    <div className="flex justify-between items-center">
+                        <span className="font-bold text-lg text-white">{slot.time}</span>
+                        <span className={`font-semibold text-sm ${isCulto ? 'text-amber-300' : 'text-slate-400'}`}>
+                           {isCulto ? '' : 'Responsável'}
+                        </span>
+                    </div>
+                    <div className="mt-1 text-center flex-grow flex flex-col justify-center">
+                        <p className={`text-xl font-bold ${isCulto ? 'text-amber-300' : 'text-sky-400'}`}>
+                            {displayResponsible}
+                        </p>
+                         {isCoord3 && isExpanded && (
+                            <div className="reveal-enter reveal-enter-active mt-2 pt-2 border-t border-blue-700/50">
+                                <p className="text-lg text-emerald-400 font-semibold">{supervisor}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const WeekCard = ({ weekData, onGeneratePdf, onCoord3Click, expandedSlots }) => {
+            const [copyStatus, setCopyStatus] = useState('Copiar');
+            const weekStart = formatDate(weekData.startDate);
+            const weekEnd = formatDate(addDays(weekData.startDate, 4));
+            
+            const DownloadIcon = () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+            );
+
+            const CopyIcon = () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
+            );
+            
+            const handleCopyToClipboard = () => {
+                let text = `*Escala da Sala de Oração*\n`;
+                text += `*Semana de ${weekStart} a ${weekEnd}*\n\n`;
+
+                weekData.days.forEach(day => {
+                    text += `*${day.dayName} (${day.date})*\n`;
+                    day.slots.forEach(slot => {
+                        const icon = slot.time === '6h' ? '☀️' : (slot.time === '19h30' ? '🙏' : '🌙');
+                        let responsibleText = slot.responsible;
+                        if (slot.responsible.includes('Coordenação 3')) {
+                            responsibleText = 'Coordenação 3';
+                        }
+                        text += `${icon} ${slot.time}: ${responsibleText}\n`;
+                    });
+                    text += '\n';
+                });
+
+                text += `_Uma Igreja com a Missão de Amar_`;
+
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed'; // Prevent scrolling to bottom of page
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    setCopyStatus('Copiado!');
+                    setTimeout(() => setCopyStatus('Copiar'), 2000);
+                } catch (err) {
+                    console.error('Falha ao copiar texto: ', err);
+                    setCopyStatus('Erro!');
+                }
+                document.body.removeChild(textArea);
+            };
+
+            return (
+                <div id={weekData.id} className="bg-slate-800/40 rounded-2xl shadow-lg p-4 md:p-6 mb-8 backdrop-blur-sm border border-slate-700/50">
+                    <div className="flex flex-col md:flex-row justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-white mb-2 md:mb-0">
+                           Semana de <span className="text-amber-400">{weekStart}</span> a <span className="text-amber-400">{weekEnd}</span>
+                        </h2>
+                        <div className="flex items-center gap-2 mt-2 md:mt-0">
+                             <button 
+                                onClick={handleCopyToClipboard}
+                                className={`flex items-center gap-2 px-4 py-2 text-white font-semibold rounded-lg transition-colors duration-300 shadow-md ${copyStatus === 'Copiado!' ? 'bg-green-600' : 'bg-sky-600 hover:bg-sky-700'}`}
+                            >
+                               <CopyIcon />
+                               {copyStatus}
+                            </button>
+                            <button 
+                                onClick={() => onGeneratePdf(weekData.id)}
+                                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white font-semibold rounded-lg hover:bg-amber-600 transition-colors duration-300 shadow-md"
+                            >
+                               <DownloadIcon />
+                               Gerar PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        {weekData.days.map((day, index) => (
+                            <div key={index} className="bg-slate-900/40 p-3 rounded-xl">
+                                <h3 className="font-bold text-center text-lg mb-3 border-b border-slate-700 pb-2">{day.dayName} <span className="text-slate-400 text-sm block">{day.date}</span></h3>
+                                <div className="space-y-3">
+                                    {day.slots.map(slot => (
+                                        <SlotCard 
+                                          key={`${day.date}-${slot.time}`} 
+                                          slot={slot}
+                                          onCoord3Click={() => onCoord3Click(`${weekData.id}-${day.date}-${slot.time}`)} 
+                                          isExpanded={expandedSlots[`${weekData.id}-${day.date}-${slot.time}`]}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const PdfLayout = React.forwardRef(({ weekData }, ref) => {
+             if(!weekData) return null;
+             const weekStart = formatDate(weekData.startDate);
+             const weekEnd = formatDate(addDays(weekData.startDate, 4));
+             return (
+                 <div ref={ref} className="pdf-container">
+                    <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '1rem' }}>
+                         <h1 style={{ fontSize: '1.7rem', fontWeight: 'bold', color: '#0f172a' }}>IDPB <span style={{color: '#f59e0b'}}>Filadélfia</span></h1>
+                         <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: '#334155' }}>Escala da Sala de Oração</h2>
+                         <h3 style={{ fontSize: '1rem', fontWeight: '500', color: '#475569' }}>Semana de {weekStart} a {weekEnd}</h3>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
+                        {weekData.days.map(day => (
+                            <div key={day.date} style={{ border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '0.5rem' }}>
+                                <h3 style={{ fontWeight: 'bold', textAlign: 'center', fontSize: '0.9rem', marginBottom: '0.75rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                                    {day.dayName}<br/><span style={{ fontSize: '0.75rem', color: '#64748b' }}>{day.date}</span>
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {day.slots.map(slot => {
+                                        const isCoord3 = slot.responsible.includes('Coordenação 3');
+                                        let mainText = slot.responsible;
+                                        if (isCoord3) {
+                                            mainText = 'Coordenação 3';
+                                        }
+
+                                        return (
+                                            <div key={slot.time} style={{ backgroundColor: slot.responsible.includes('Culto') ? '#fffbeb' : '#f8fafc', borderRadius: '0.375rem', padding: '0.5rem', textAlign: 'center' }}>
+                                                <p style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#0f172a' }}>{slot.time}</p>
+                                                <p style={{ fontSize: '1rem', fontWeight: 'bold', wordBreak: 'break-word', color: slot.responsible.includes('Culto') ? '#b45309' : '#1d4ed8', marginTop: '0.25rem' }}>
+                                                    {mainText}
+                                                </p>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Gerado em {formatDate(new Date())} | UMA IGREJA COM A MISSÃO DE AMAR
+                    </p>
+                 </div>
+             )
+        });
+
+        const App = () => {
+            const [numWeeks, setNumWeeks] = useState(4);
+            const [filterCoord, setFilterCoord] = useState('all');
+            const [scheduleData, setScheduleData] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            const [expandedSlots, setExpandedSlots] = useState({});
+            
+            const [pdfWeekData, setPdfWeekData] = useState(null);
+            const pdfRef = React.useRef();
+
+            useEffect(() => {
+                setIsLoading(true);
+                const today = new Date();
+                const monday = getMondayOfDate(today);
+                const data = generateScheduleData(monday, numWeeks);
+                setScheduleData(data);
+                setIsLoading(false);
+            }, [numWeeks]);
+            
+            const handleGeneratePdf = (weekId) => {
+                const weekDataToRender = scheduleData.find(w => w.id === weekId);
+                if (weekDataToRender) {
+                    setPdfWeekData(weekDataToRender); 
+                }
+            };
+            
+            useEffect(() => {
+                if (pdfWeekData && pdfRef.current) {
+                    html2canvas(pdfRef.current, { scale: 3 }).then((canvas) => {
+                        const imgData = canvas.toDataURL('image/png');
+                        const pdf = new jspdf.jsPDF({
+                            orientation: 'landscape',
+                            unit: 'px',
+                            format: [canvas.width, canvas.height]
+                        });
+                        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                        const weekStart = formatDate(pdfWeekData.startDate);
+                        pdf.save(`escala-oracao-semana-${weekStart}.pdf`);
+                        setPdfWeekData(null);
+                    });
+                }
+            }, [pdfWeekData]);
+
+            const filteredSchedule = useMemo(() => {
+                if (filterCoord === 'all') return scheduleData;
+                const coordToFilter = parseInt(filterCoord);
+                return scheduleData.map(week => {
+                    const filteredDays = week.days.map(day => {
+                        const filteredSlots = day.slots.filter(slot => slot.coord === coordToFilter || slot.coord <= 0);
+                        return { ...day, slots: filteredSlots };
+                    }).filter(day => day.slots.length > 0);
+                    if (filteredDays.length > 0) return { ...week, days: filteredDays };
+                    return null;
+                }).filter(Boolean);
+            }, [scheduleData, filterCoord]);
+
+            const toggleSlotExpansion = (slotId) => {
+                setExpandedSlots(prev => ({ ...prev, [slotId]: !prev[slotId] }));
+            }
+
+            return (
+                <div className="min-h-screen p-4 sm:p-6 lg:p-8 flex flex-col">
+                    <div className="max-w-7xl mx-auto w-full">
+                        <header className="text-center mb-10">
+                            <h1 className="text-4xl md:text-5xl font-bold text-white">IDPB <span className="text-amber-400">Filadélfia</span></h1>
+                            <p className="text-md text-slate-400 mt-1 tracking-wider">UMA IGREJA COM A MISSÃO DE AMAR</p>
+                            <h2 className="text-2xl md:text-3xl font-semibold text-slate-200 mt-6">Escala das Salas de Oração</h2>
+                        </header>
+
+                        <div className="flex flex-col md:flex-row gap-4 justify-center items-center mb-8 p-4 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold">Semanas Exibidas:</span>
+                                <span className="font-bold text-xl w-8 text-center">{numWeeks}</span>
+                                <div className="flex flex-col">
+                                  <button onClick={() => setNumWeeks(w => w + 1)} className="px-2 py-0 bg-slate-600 rounded-t-md hover:bg-slate-700 transition-colors text-lg">+</button>
+                                  <button onClick={() => setNumWeeks(w => Math.max(1, w - 1))} className="px-2 py-0 bg-slate-600 rounded-b-md hover:bg-slate-700 transition-colors text-lg">-</button>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <label htmlFor="coord-filter" className="font-semibold">Filtrar:</label>
+                                <select 
+                                    id="coord-filter" 
+                                    value={filterCoord}
+                                    onChange={(e) => setFilterCoord(e.target.value)}
+                                    className="bg-slate-700 border border-slate-600 text-white rounded-lg p-2 focus:ring-amber-500 focus:border-amber-500"
+                                >
+                                    <option value="all">Todas</option>
+                                    {[...Array(7).keys()].map(i => (
+                                        <option key={i+1} value={i+1}>Coord. {i+1}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {isLoading ? (
+                            <p className="text-center text-xl">Gerando escala...</p>
+                        ) : (
+                            <div>
+                                {filteredSchedule.length > 0 ? filteredSchedule.map(week => (
+                                    <WeekCard 
+                                      key={week.id} 
+                                      weekData={week} 
+                                      onGeneratePdf={handleGeneratePdf} 
+                                      onCoord3Click={toggleSlotExpansion}
+                                      expandedSlots={expandedSlots}
+                                    />
+                                )) : (
+                                    <div className="text-center bg-slate-800 p-8 rounded-lg">
+                                        <h3 className="text-2xl font-semibold text-amber-400">Nenhum horário encontrado</h3>
+                                        <p className="text-slate-300 mt-2">A coordenação selecionada não possui escalas no período exibido.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    <footer className="w-full mt-auto text-center p-4 text-slate-500 text-sm">
+                        Desenvolvido por Ediel Santos
+                    </footer>
+
+                    <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
+                      <PdfLayout ref={pdfRef} weekData={pdfWeekData} />
+                    </div>
+                </div>
+            );
+        };
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+
+    </script>
+</body>
+</html>

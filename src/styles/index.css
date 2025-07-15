@@ -1,0 +1,29 @@
+/* Custom Font Poppins */
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #0f172a; /* bg-slate-900 */
+    color: #f1f5f9; /* text-slate-100 */
+}
+
+/* Style for the PDF generation container */
+.pdf-container {
+    font-family: 'Poppins', sans-serif;
+    background-color: white;
+    color: #1e293b;
+    padding: 1.5rem;
+    width: 820px;
+}
+.pdf-container h1, .pdf-container h2, .pdf-container h3 {
+    color: #0f172a;
+}
+
+/* Custom animation for revealing supervisor */
+.reveal-enter {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+.reveal-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms, transform 300ms;
+}
