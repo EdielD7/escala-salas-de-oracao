@@ -109,16 +109,58 @@
             let initialCoordIndex = 0;
             let initialSupervisorIndex = 0;
 
+            // This loop calculates the starting point for the indexes based on the current date
             while (initialDate < startDate) {
-                 const dayOfWeek = initialDate.getDay();
-                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                const dayOfWeek = initialDate.getDay();
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
+                    // 6h Slot (not on Monday for Pr. Joel)
                     if (dayOfWeek !== 1) {
-                        if (coordinations[initialCoordIndex % 7] === 3) initialSupervisorIndex++;
+                        if (coordinations[initialCoordIndex % 7] === 3) {
+                            initialSupervisorIndex++;
+                        }
                         initialCoordIndex++;
                     }
+                    // 21h Slot (not on Wednesday for Culto)
                     if (dayOfWeek !== 3) {
-                       if (coordinations[initialCoordIndex % 7] === 3) initialSupervisorIndex++;
-                       initialCoordIndex++;
+                        const currentCoord = coordinations[initialCoordIndex % 7];
+                        if (currentCoord === 3) {
+                            // Pre-scan the week to check if this is Daniel's slot
+                            const weekStartForCheck = getMondayOfDate(initialDate);
+                            let tempScanDate = new Date(weekStartForCheck);
+                            const appearances = [];
+                            let tempScanCoordIndex = 0;
+                            // We need to find the coordIndex at the start of that week to do the scan
+                            let findStartOfWeekIndex = new Date(baseDate);
+                            let startOfWeekIndex = 0;
+                             while(findStartOfWeekIndex < weekStartForCheck){
+                                const d = findStartOfWeekIndex.getDay();
+                                if(d >=1 && d<=5){
+                                    if(d !== 1) startOfWeekIndex++;
+                                    if(d !== 3) startOfWeekIndex++;
+                                }
+                                findStartOfWeekIndex = addDays(findStartOfWeekIndex, 1);
+                            }
+                            tempScanCoordIndex = startOfWeekIndex;
+                            
+                            for(let i=0; i<5; i++){
+                                const d = tempScanDate.getDay();
+                                if (d !== 1) {
+                                    if(coordinations[tempScanCoordIndex % 7] === 3) appearances.push(1);
+                                    tempScanCoordIndex++;
+                                }
+                                if (d !== 3) {
+                                    if(coordinations[tempScanCoordIndex % 7] === 3) appearances.push(1);
+                                    tempScanCoordIndex++;
+                                }
+                                tempScanDate = addDays(tempScanDate, 1);
+                            }
+
+                            const isDanielSlot = appearances.length >= 2 && dayOfWeek === 5;
+                            if (!isDanielSlot) {
+                                initialSupervisorIndex++;
+                            }
+                        }
+                        initialCoordIndex++;
                     }
                 }
                 initialDate = addDays(initialDate, 1);
@@ -126,28 +168,27 @@
             coordIndex = initialCoordIndex;
             supervisorIndex = initialSupervisorIndex;
 
+            // This loop generates the schedule for display
             for (let week = 0; week < numWeeks; week++) {
                 const weekData = { id: `week-${week}`, startDate: new Date(currentDate), days: [] };
-                const weekCoord3Appearances = [];
-
-                let tempCurrentDate = new Date(currentDate);
-                let tempCoordIndex = coordIndex;
-                for (let day = 0; day < 5; day++) {
-                    const dayOfWeek = tempCurrentDate.getDay();
-                    if(dayOfWeek !== 1){
-                        if (coordinations[tempCoordIndex % 7] === 3) weekCoord3Appearances.push({ dayOfWeek, time: '6h' });
-                        tempCoordIndex++;
-                    }
-                    if (dayOfWeek !== 3) {
-                        if (coordinations[tempCoordIndex % 7] === 3) weekCoord3Appearances.push({ dayOfWeek, time: '21h' });
-                        tempCoordIndex++;
-                    }
-                    tempCurrentDate = addDays(tempCurrentDate, 1);
-                }
                 
-                const isDanielWeek = weekCoord3Appearances.length >= 2 && 
-                    weekCoord3Appearances.some(a => a.dayOfWeek === 1) && 
-                    weekCoord3Appearances.some(a => a.dayOfWeek === 5);
+                // Pre-scan the current week to identify if it's a "Daniel Week"
+                const weekCoord3Appearances = [];
+                let tempCurrentDateForScan = new Date(currentDate);
+                let tempCoordIndexForScan = coordIndex;
+                for (let day = 0; day < 5; day++) {
+                    const dayOfWeek = tempCurrentDateForScan.getDay();
+                    if (dayOfWeek !== 1) { // Pr. Joel is always Monday 6h
+                        if (coordinations[tempCoordIndexForScan % 7] === 3) weekCoord3Appearances.push(1);
+                        tempCoordIndexForScan++;
+                    }
+                    if (dayOfWeek !== 3) { // Culto is always Wednesday 21h
+                        if (coordinations[tempCoordIndexForScan % 7] === 3) weekCoord3Appearances.push(1);
+                        tempCoordIndexForScan++;
+                    }
+                    tempCurrentDateForScan = addDays(tempCurrentDateForScan, 1);
+                }
+                const isDanielWeek = weekCoord3Appearances.length >= 2;
 
                 for (let day = 0; day < 5; day++) {
                     const dayOfWeek = currentDate.getDay();
@@ -162,7 +203,7 @@
                         let responsible = `Coordenação ${currentCoord}`;
                         if (currentCoord === 3) {
                             responsible = `Coordenação 3 (${supervisorsCoord3[supervisorIndex % supervisorsCoord3.length]})`;
-                            supervisorIndex++;
+                            supervisorIndex++; // Only increment for regular supervisor slots
                         }
                         daySlots.slots.push({ time: '6h', responsible, coord: currentCoord });
                         coordIndex++;
@@ -172,13 +213,16 @@
                     if (dayOfWeek !== 3) {
                         const currentCoord = coordinations[coordIndex % 7];
                         let responsible = `Coordenação ${currentCoord}`;
+                        const isSpecialFriday = isDanielWeek && dayOfWeek === 5;
+                        
                         if (currentCoord === 3) {
-                             if(isDanielWeek && dayOfWeek === 5) {
+                             if (isSpecialFriday) {
                                 responsible = `Coordenação 3 (Daniel - Coordenador)`;
+                                // DO NOT increment supervisorIndex here
                              } else {
                                 responsible = `Coordenação 3 (${supervisorsCoord3[supervisorIndex % supervisorsCoord3.length]})`;
+                                supervisorIndex++; // Increment for regular supervisor slots
                              }
-                            supervisorIndex++;
                         }
                         daySlots.slots.push({ time: '21h', responsible, coord: currentCoord });
                         coordIndex++;

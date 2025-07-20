@@ -1,4 +1,4 @@
-import { addDays } from '../utils/helpers';
+import { addDays, formatDate, capitalize } from '../utils/helpers';
 
 export const generateScheduleData = (startDate, numWeeks) => {
     // A função original generateScheduleData foi movida para cá, sem alterações na sua lógica interna.

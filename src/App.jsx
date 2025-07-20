@@ -34,21 +34,35 @@ function App() {
             };
             
             useEffect(() => {
-                if (pdfWeekData && pdfRef.current) {
-                    html2canvas(pdfRef.current, { scale: 3 }).then((canvas) => {
-                        const imgData = canvas.toDataURL('image/png');
-                        const pdf = new jspdf.jsPDF({
-                            orientation: 'landscape',
-                            unit: 'px',
-                            format: [canvas.width, canvas.height]
-                        });
-                        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                        const weekStart = formatDate(pdfWeekData.startDate);
-                        pdf.save(`escala-oracao-semana-${weekStart}.pdf`);
-                        setPdfWeekData(null);
-                    });
-                }
-            }, [pdfWeekData]);
+        // A condição continua a mesma
+        if (pdfWeekData && pdfRef.current) {
+            
+            // html2canvas também continua igual
+            html2canvas(pdfRef.current, { scale: 3 }).then((canvas) => {
+                const imgData = canvas.toDataURL('image/png');
+
+                // ---- AQUI ESTÁ A CORREÇÃO ----
+                // Trocamos 'new jspdf.jsPDF' por 'new jsPDF'
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                // -----------------------------
+
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                const weekStart = formatDate(pdfWeekData.startDate);
+                pdf.save(`escala-oracao-semana-${weekStart}.pdf`);
+                
+                // Resetar o estado para permitir gerar outros PDFs depois
+                setPdfWeekData(null);
+            }).catch(err => {
+                // Adicionar um .catch é uma boa prática para ver erros silenciosos
+                console.error("Erro durante a geração do PDF:", err);
+                setPdfWeekData(null); // Reseta mesmo se der erro
+            });
+        }
+    }, [pdfWeekData]);
 
             const filteredSchedule = useMemo(() => {
                 if (filterCoord === 'all') return scheduleData;

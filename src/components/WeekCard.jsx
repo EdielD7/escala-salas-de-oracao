@@ -24,7 +24,28 @@ const WeekCard = ({ weekData, onGeneratePdf, onCoord3Click, expandedSlots }) => 
         let text = `*Escala da Sala de Oração*\n`;
         text += `*Semana de ${weekStart} a ${weekEnd}*\n\n`;
         
-        // ... (restante da lógica de criação do texto)
+        weekData.days.forEach(day => {
+                    text += `*${day.dayName} (${day.date})*\n`;
+                    day.slots.forEach(slot => {
+                        const icon = slot.time === '6h' ? '☀️' : (slot.time === '19h30' ? '🙏' : '🌙');
+                        let responsibleText = slot.responsible;
+                        if (slot.responsible.includes('Coordenação 3')) {
+                            responsibleText = 'Coordenação 3';
+                        }
+                        text += `${icon} ${slot.time}: ${responsibleText}\n`;
+                    });
+                    text += '\n';
+                });
+
+                text += `_Uma Igreja com a Missão de Amar_`;
+
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed'; // Prevent scrolling to bottom of page
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
 
         try {
             await navigator.clipboard.writeText(text);
