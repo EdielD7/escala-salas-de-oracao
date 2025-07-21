@@ -4,13 +4,13 @@ export const generateScheduleData = (startDate, numWeeks) => {
     // A função original generateScheduleData foi movida para cá, sem alterações na sua lógica interna.
     const schedule = [];
             const coordinations = [1, 2, 3, 4, 5, 6, 7];
-            const supervisorsCoord3 = ['Lucivaldo', 'Flávio', 'Ediel', 'Tony', 'Henrique'];
+            const supervisorsCoord3 = [ 'Flávio', 'Ediel', 'Tony', 'Henrique', 'Lucivaldo' ];
             
             let currentDate = new Date(startDate);
             let coordIndex = 0;
             let supervisorIndex = 0;
 
-            const baseDate = new Date('2025-06-02T00:00:00');
+            const baseDate = new Date('2025-07-21T00:00:00');
             let initialDate = new Date(baseDate);
             let initialCoordIndex = 0;
             let initialSupervisorIndex = 0;
@@ -75,20 +75,31 @@ export const generateScheduleData = (startDate, numWeeks) => {
                     }
 
                     // 21h Slot
-                    if (dayOfWeek !== 3) {
-                        const currentCoord = coordinations[coordIndex % 7];
-                        let responsible = `Coordenação ${currentCoord}`;
-                        if (currentCoord === 3) {
-                             if(isDanielWeek && dayOfWeek === 5) {
-                                responsible = `Coordenação 3 (Daniel - Coordenador)`;
-                             } else {
-                                responsible = `Coordenação 3 (${supervisorsCoord3[supervisorIndex % supervisorsCoord3.length]})`;
-                             }
-                            supervisorIndex++;
-                        }
-                        daySlots.slots.push({ time: '21h', responsible, coord: currentCoord });
-                        coordIndex++;
-                    } else {
+                    // DENTRO DO LOOP DE GERAÇÃO DA ESCALA...
+
+// 21h Slot
+if (dayOfWeek !== 3) { // Se não for quarta-feira à noite...
+    const currentCoord = coordinations[coordIndex % 7];
+    let responsible = `Coordenação ${currentCoord}`;
+    
+    // 1. Primeiro, definimos a condição da exceção
+    const isSpecialFriday = isDanielWeek && dayOfWeek === 5;
+    
+    if (currentCoord === 3) {
+         // 2. AGORA, a verificação da exceção vem ANTES
+         if (isSpecialFriday) {
+            responsible = `Coordenação 3 (Daniel - Coordenador)`;
+            // Note que o supervisorIndex NÃO é incrementado aqui.
+            // A vez do supervisor fica "congelada" para a próxima oportunidade.
+         } else {
+            // 3. Esta é a regra geral, para todos os outros casos
+            responsible = `Coordenação 3 (${supervisorsCoord3[supervisorIndex % supervisorsCoord3.length]})`;
+            supervisorIndex++; // O índice SÓ AVANÇA quando um supervisor é de fato escalado.
+         }
+    }
+    daySlots.slots.push({ time: '21h', responsible, coord: currentCoord });
+    coordIndex++;
+} else {
                         daySlots.slots.push({ time: '19h30', responsible: 'Culto de Oração', coord: -1 });
                     }
                     weekData.days.push(daySlots);
