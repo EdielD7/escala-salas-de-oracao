@@ -8,7 +8,7 @@ import WeekCard from './components/WeekCard';
 import PdfLayout from './components/PdfLayout';
 
 function App() {
-    const [numWeeks, setNumWeeks] = useState(4);
+    const [numWeeks, setNumWeeks] = useState(1);
             const [filterCoord, setFilterCoord] = useState('all');
             const [scheduleData, setScheduleData] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
@@ -101,7 +101,7 @@ function App() {
                             </div>
 
                             <div className="flex items-center gap-4">
-                                <label htmlFor="coord-filter" className="font-semibold">Filtrar:</label>
+                                <label htmlFor="coord-filter" className="font-semibold">Coordenação:</label>
                                 <select 
                                     id="coord-filter" 
                                     value={filterCoord}
